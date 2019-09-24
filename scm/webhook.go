@@ -5,6 +5,7 @@
 package scm
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -19,6 +20,13 @@ type (
 	// Webhook defines a webhook for repository events.
 	Webhook interface {
 		Repository() Repository
+	}
+
+	// WebhookUnmarshaler wraps Webhook and assigns a type for unmarshalling.
+	// Use this if you need to deserialize Webhooks of uknown concrete type.
+	WebhookUnmarshaler struct {
+		Type    string
+		Webhook Webhook
 	}
 
 	// Label on a PR
@@ -174,3 +182,239 @@ func (h *IssueCommentHook) Repository() Repository       { return h.Repo }
 func (h *PullRequestHook) Repository() Repository        { return h.Repo }
 func (h *PullRequestCommentHook) Repository() Repository { return h.Repo }
 func (h *ReviewCommentHook) Repository() Repository      { return h.Repo }
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *PushHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "pushHook"
+
+	hook["ref"] = h.Ref
+	hook["baseRef"] = h.BaseRef
+	hook["repo"] = h.Repo
+	hook["before"] = h.Before
+	hook["after"] = h.After
+	hook["created"] = h.Created
+	hook["deleted"] = h.Deleted
+	hook["forced"] = h.Forced
+	hook["compare"] = h.Compare
+	hook["commits"] = h.Commits
+	hook["commit"] = h.Commit
+	hook["sender"] = h.Sender
+	hook["guid"] = h.GUID
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *BranchHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "branchHook"
+
+	hook["ref"] = h.Ref
+	hook["repo"] = h.Repo
+	hook["action"] = h.Action
+	hook["sender"] = h.Sender
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *DeployHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "deployHook"
+
+	hook["data"] = h.Data
+	hook["desc"] = h.Desc
+	hook["ref"] = h.Ref
+	hook["repo"] = h.Repo
+	hook["sender"] = h.Sender
+	hook["target"] = h.Target
+	hook["targetUrl"] = h.TargetURL
+	hook["task"] = h.Task
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *TagHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "tagHook"
+
+	hook["ref"] = h.Ref
+	hook["repo"] = h.Repo
+	hook["action"] = h.Action
+	hook["sender"] = h.Sender
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *IssueHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "issueHook"
+
+	hook["action"] = h.Action
+	hook["repo"] = h.Repo
+	hook["issue"] = h.Issue
+	hook["sender"] = h.Sender
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *IssueCommentHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "issueCommentHook"
+
+	hook["action"] = h.Action
+	hook["repo"] = h.Repo
+	hook["issue"] = h.Issue
+	hook["comment"] = h.Comment
+	hook["sender"] = h.Sender
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *PullRequestHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "pullRequestHook"
+
+	hook["action"] = h.Action
+	hook["repo"] = h.Repo
+	hook["label"] = h.Label
+	hook["pullRequest"] = h.PullRequest
+	hook["sender"] = h.Sender
+	hook["changes"] = h.Changes
+	hook["guid"] = h.GUID
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *PullRequestCommentHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "pullRequestCommentHook"
+
+	hook["action"] = h.Action
+	hook["repo"] = h.Repo
+	hook["pullRequest"] = h.PullRequest
+	hook["comment"] = h.Comment
+	hook["sender"] = h.Sender
+
+	return json.Marshal(hook)
+}
+
+// MarshalJSON implements custom JSON marshaling logic.
+func (h *ReviewCommentHook) MarshalJSON() ([]byte, error) {
+	hook := make(map[string]interface{})
+	hook["type"] = "reviewCommentHook"
+
+	hook["action"] = h.Action
+	hook["repo"] = h.Repo
+	hook["pullRequest"] = h.PullRequest
+	hook["review"] = h.Review
+
+	return json.Marshal(hook)
+}
+
+// UnmarshalJSON supports deserialization of GitEventSpec.ParsedWebhook into a concrete implementation of scm.Webhook
+func (wu *WebhookUnmarshaler) UnmarshalJSON(b []byte) error {
+	var objMap map[string]*json.RawMessage
+	err := json.Unmarshal(b, &objMap)
+	if err != nil {
+		return err
+	}
+
+	var rawMessage *json.RawMessage
+	var webhookMap map[string]string
+	err = json.Unmarshal(*rawMessage, &webhookMap)
+	if err != nil {
+		return err
+	}
+
+	if webhookMap["type"] == "pushHook" {
+
+		var h *PushHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "branchHook" {
+
+		var h *BranchHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "deployHook" {
+
+		var h *DeployHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "tagHook" {
+
+		var h *TagHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "issueHook" {
+
+		var h *IssueHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "issueCommentHook" {
+
+		var h *IssueHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "pullRequestHook" {
+
+		var h *IssueHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "pullRequestCommentHook" {
+
+		var h *IssueHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	} else if webhookMap["type"] == "reviewCommentHook" {
+
+		var h *IssueHook
+		err = json.Unmarshal(*rawMessage, h)
+		if err != nil {
+			return err
+		}
+		wu.Webhook = h
+
+	}
+
+	return nil
+}
